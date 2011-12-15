@@ -1,0 +1,177 @@
+Index: share/tilt_wii.c
+===================================================================
+--- share/tilt_wii.c	(revision 3711)
++++ share/tilt_wii.c	(working copy)
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2003 Robert Kooima
++ * Copyright (C) 2011 Daniel Friesel
+  *
+  * NEVERBALL is  free software; you can redistribute  it and/or modify
+  * it under the  terms of the GNU General  Public License as published
+@@ -22,9 +23,11 @@
+ /*---------------------------------------------------------------------------*/
+ 
+ #define _ENABLE_TILT
+-#include <libcwiimote/wiimote.h>
+-#include <libcwiimote/wiimote_api.h>
++#include <bluetooth/bluetooth.h>
++#include <cwiid.h>
+ 
++struct balance_cal balance_cal;
++
+ /*
+  * This data structure tracks button changes, counting transitions so that
+  * none are missed if the event handling thread falls significantly behind
+@@ -43,6 +46,23 @@
+     unsigned char dnc;
+ };
+ 
++
++/* not having and setting a callback causes problems with SDL's mutex
++ * ("Mesg pipe is full")
++ */
++static void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
++	union cwiid_mesg mesg[], struct timespec *ts)
++{
++}
++
++static double weight(unsigned short reading, unsigned short cal[3])
++{
++	if (reading < cal[1])
++		return ((double)reading - cal[0]) / (cal[1] - cal[0]) * 17.0;
++
++	return (((double)reading - cal[1]) / (cal[2] - cal[1]) * 17.0) + 17.0;
++}
++
+ static void set_button(struct button_state *B, int s)
+ {
+     if ((B->curr == 0) != (s == 0))
+@@ -106,59 +126,80 @@
+ 
+ static int tilt_func(void *data)
+ {
+-    wiimote_t   wiimote = WIIMOTE_INIT;
+-    const char *address = config_get_s(CONFIG_WIIMOTE_ADDR);
++    cwiid_wiimote_t *wiimote = NULL;
+ 
+-    if (strlen(address) > 0)
+-    {
+-        if (wiimote_connect(&wiimote, address) < 0)
+-            fprintf(stderr, "%s\n", wiimote_get_error());
+-        else
+-        {
+-            int running = 1;
++    struct cwiid_state wiistate;
+ 
+-            wiimote.mode.bits = WIIMOTE_MODE_ACC;
+-            wiimote.led.one   = 1;
++    double wlt, wrt, wlb, wrb, bal_x, bal_y;
+ 
++    if ((wiimote = cwiid_open(BDADDR_ANY, 0)) == NULL)
++		fprintf(stderr, "Unable to connect to bboard\n");
++	else
++	{
++		int running = 1;
++
++		cwiid_set_led(wiimote, 1);
++		cwiid_get_balance_cal(wiimote, &balance_cal);
++		cwiid_set_mesg_callback(wiimote, cwiid_callback);
++		cwiid_enable(wiimote, CWIID_FLAG_MESG_IFC);
++		cwiid_set_rpt_mode(wiimote, CWIID_RPT_STATUS | CWIID_RPT_EXT);
++
+             SDL_mutexP(mutex);
+             state.status = running;
+             SDL_mutexV(mutex);
+ 
+-            while (mutex && running && wiimote_is_open(&wiimote))
++            while (mutex && running)
+             {
+-                if (wiimote_update(&wiimote) < 0)
+-                    break;
+ 
+                 SDL_mutexP(mutex);
+                 {
+                     running = state.status;
+ 
+-                    set_button(&state.A,     wiimote.keys.a);
+-                    set_button(&state.B,     wiimote.keys.b);
+-                    set_button(&state.plus,  wiimote.keys.plus);
+-                    set_button(&state.minus, wiimote.keys.minus);
+-                    set_button(&state.home,  wiimote.keys.home);
+-                    set_button(&state.L,     wiimote.keys.left);
+-                    set_button(&state.R,     wiimote.keys.right);
+-                    set_button(&state.U,     wiimote.keys.up);
+-                    set_button(&state.D,     wiimote.keys.down);
++                    set_button(&state.A,     0);
++                    set_button(&state.B,     0);
++                    set_button(&state.plus,  0);
++                    set_button(&state.minus, 0);
++                    set_button(&state.home,  0);
++                    set_button(&state.L,     0);
++                    set_button(&state.R,     0);
++                    set_button(&state.U,     0);
++                    set_button(&state.D,     0);
+ 
+-                    if (isnormal(wiimote.tilt.y))
++				cwiid_get_state(wiimote, &wiistate);
++
++				wlt = weight(wiistate.ext.balance.left_top, balance_cal.left_top);
++				wrt = weight(wiistate.ext.balance.right_top, balance_cal.right_top);
++				wlb = weight(wiistate.ext.balance.left_bottom, balance_cal.left_bottom);
++				wrb = weight(wiistate.ext.balance.right_bottom, balance_cal.right_bottom);
++
++				bal_x = (wrt + wrb) / (wlt + wlb);
++				if (bal_x > 1)
++					bal_x = ((wlt + wlb) / (wrt + wrb) * (-1.0)) + 1.0;
++				else
++					bal_x -= 1;
++
++				bal_y = (wlt + wrt) / (wlb + wrb);
++				if (bal_y > 1)
++					bal_y = ((wlb + wrb) / (wlt + wrt) * (-1.0)) + 1.0;
++				else
++					bal_y -= 1;
++
++                    if ((bal_y >= -1) && (bal_y <= 1))
+                     {
++					bal_y *= 12;
+                         state.x = (state.x * (FILTER - 1) +
+-                                   wiimote.tilt.y) / FILTER;
++                                   bal_y) / FILTER;
+                     }
+-                    if (isnormal(wiimote.tilt.x))
++                    if ((bal_x >= -1) && (bal_x <= 1))
+                     {
++					bal_x *= 12;
+                         state.z = (state.z * (FILTER - 1) +
+-                                   wiimote.tilt.x) / FILTER;
++                                   bal_x) / FILTER;
+                     }
+                 }
+                 SDL_mutexV(mutex);
+             }
+ 
+-            wiimote_disconnect(&wiimote);
+-        }
+     }
+     return 0;
+ }
+@@ -295,3 +336,4 @@
+ }
+ 
+ /*---------------------------------------------------------------------------*/
++
+Index: Makefile
+===================================================================
+--- Makefile	(revision 3711)
++++ Makefile	(working copy)
+@@ -105,7 +105,7 @@
+ INTL_LIBS :=
+ 
+ ifeq ($(ENABLE_TILT),wii)
+-    TILT_LIBS := -lcwiimote -lbluetooth
++    TILT_LIBS := -lcwiid -lbluetooth
+ else
+ ifeq ($(ENABLE_TILT),loop)
+     TILT_LIBS := -lusb-1.0 -lfreespace
