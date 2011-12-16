@@ -172,7 +172,7 @@ index 44eaf73..5427540 100644
 +
 +                    if ((bal_y >= -1) && (bal_y <= 1))
                      {
-+					bal_y *= 15;
++					bal_y *= 20;
                          state.x = (state.x * (FILTER - 1) +
 -                                   wiimote.tilt.y) / FILTER;
 +                                   bal_y) / FILTER;
@@ -180,7 +180,7 @@ index 44eaf73..5427540 100644
 -                    if (isnormal(wiimote.tilt.x))
 +                    if ((bal_x >= -1) && (bal_x <= 1))
                      {
-+					bal_x *= 15;
++					bal_x *= 20;
                          state.z = (state.z * (FILTER - 1) +
 -                                   wiimote.tilt.x) / FILTER;
 +                                   bal_x) / FILTER;
