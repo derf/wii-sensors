@@ -1,7 +1,20 @@
-Index: share/tilt_wii.c
-===================================================================
---- share/tilt_wii.c	(revision 3711)
-+++ share/tilt_wii.c	(working copy)
+diff --git a/Makefile b/Makefile
+index 169b9f8..b6a1878 100644
+--- a/Makefile
++++ b/Makefile
+@@ -108,7 +108,7 @@ endif
+ INTL_LIBS :=
+ 
+ ifeq ($(ENABLE_TILT),wii)
+-    TILT_LIBS := -lcwiimote -lbluetooth
++    TILT_LIBS := -lcwiid -lbluetooth
+ else
+ ifeq ($(ENABLE_TILT),loop)
+     TILT_LIBS := -lusb-1.0 -lfreespace
+diff --git a/share/tilt_wii.c b/share/tilt_wii.c
+index 44eaf73..5427540 100644
+--- a/share/tilt_wii.c
++++ b/share/tilt_wii.c
 @@ -1,5 +1,6 @@
  /*
   * Copyright (C) 2003 Robert Kooima
@@ -9,7 +22,15 @@ Index: share/tilt_wii.c
   *
   * NEVERBALL is  free software; you can redistribute  it and/or modify
   * it under the  terms of the GNU General  Public License as published
-@@ -22,9 +23,11 @@
+@@ -15,6 +16,7 @@
+ #include <SDL.h>
+ #include <SDL_thread.h>
+ #include <math.h>
++#include <unistd.h>
+ #include <stdio.h>
+ 
+ #include "config.h"
+@@ -22,8 +24,10 @@
  /*---------------------------------------------------------------------------*/
  
  #define _ENABLE_TILT
@@ -17,13 +38,12 @@ Index: share/tilt_wii.c
 -#include <libcwiimote/wiimote_api.h>
 +#include <bluetooth/bluetooth.h>
 +#include <cwiid.h>
- 
-+struct balance_cal balance_cal;
 +
++struct balance_cal balance_cal;
+ 
  /*
   * This data structure tracks button changes, counting transitions so that
-  * none are missed if the event handling thread falls significantly behind
-@@ -43,6 +46,23 @@
+@@ -43,6 +47,23 @@ struct button_state
      unsigned char dnc;
  };
  
@@ -47,13 +67,14 @@ Index: share/tilt_wii.c
  static void set_button(struct button_state *B, int s)
  {
      if ((B->curr == 0) != (s == 0))
-@@ -106,59 +126,80 @@
+@@ -106,59 +127,96 @@ static SDL_Thread       *thread = NULL;
  
  static int tilt_func(void *data)
  {
 -    wiimote_t   wiimote = WIIMOTE_INIT;
 -    const char *address = config_get_s(CONFIG_WIIMOTE_ADDR);
 +    cwiid_wiimote_t *wiimote = NULL;
++    cwiid_wiimote_t *remote = NULL;
  
 -    if (strlen(address) > 0)
 -    {
@@ -63,23 +84,37 @@ Index: share/tilt_wii.c
 -        {
 -            int running = 1;
 +    struct cwiid_state wiistate;
++    struct cwiid_state remstate;
++
++    bdaddr_t addr_board;
++    bdaddr_t addr_remote;
++
++    str2ba("00:26:59:62:A6:8F", &addr_remote);
++    str2ba("00:26:59:82:16:C0", &addr_board);
  
 -            wiimote.mode.bits = WIIMOTE_MODE_ACC;
 -            wiimote.led.one   = 1;
 +    double wlt, wrt, wlb, wrb, bal_x, bal_y;
- 
-+    if ((wiimote = cwiid_open(BDADDR_ANY, 0)) == NULL)
++
++	remote = cwiid_open(&addr_remote, 0);
++	cwiid_set_led(remote, 2);
++	wiimote = cwiid_open(&addr_board, 0);
++	cwiid_set_led(wiimote, 1);
++
++	if ((wiimote == NULL) || (remote == NULL))
 +		fprintf(stderr, "Unable to connect to bboard\n");
 +	else
 +	{
 +		int running = 1;
 +
-+		cwiid_set_led(wiimote, 1);
 +		cwiid_get_balance_cal(wiimote, &balance_cal);
 +		cwiid_set_mesg_callback(wiimote, cwiid_callback);
++		cwiid_set_mesg_callback(remote, cwiid_callback);
 +		cwiid_enable(wiimote, CWIID_FLAG_MESG_IFC);
++		cwiid_enable(remote, CWIID_FLAG_MESG_IFC);
 +		cwiid_set_rpt_mode(wiimote, CWIID_RPT_STATUS | CWIID_RPT_EXT);
-+
++		cwiid_set_rpt_mode(remote, CWIID_RPT_STATUS | CWIID_RPT_BTN);
+ 
              SDL_mutexP(mutex);
              state.status = running;
              SDL_mutexV(mutex);
@@ -103,18 +138,20 @@ Index: share/tilt_wii.c
 -                    set_button(&state.R,     wiimote.keys.right);
 -                    set_button(&state.U,     wiimote.keys.up);
 -                    set_button(&state.D,     wiimote.keys.down);
-+                    set_button(&state.A,     0);
-+                    set_button(&state.B,     0);
-+                    set_button(&state.plus,  0);
-+                    set_button(&state.minus, 0);
-+                    set_button(&state.home,  0);
-+                    set_button(&state.L,     0);
-+                    set_button(&state.R,     0);
-+                    set_button(&state.U,     0);
-+                    set_button(&state.D,     0);
- 
+-
 -                    if (isnormal(wiimote.tilt.y))
 +				cwiid_get_state(wiimote, &wiistate);
++				cwiid_get_state(remote, &remstate);
++
++                    set_button(&state.A,     remstate.buttons & CWIID_BTN_A);
++                    set_button(&state.B,     remstate.buttons & CWIID_BTN_B);
++                    set_button(&state.plus,  remstate.buttons & CWIID_BTN_PLUS);
++                    set_button(&state.minus, remstate.buttons & CWIID_BTN_MINUS);
++                    set_button(&state.home,  remstate.buttons & CWIID_BTN_HOME);
++                    set_button(&state.L,     remstate.buttons & CWIID_BTN_LEFT);
++                    set_button(&state.R,     remstate.buttons & CWIID_BTN_RIGHT);
++                    set_button(&state.U,     remstate.buttons & CWIID_BTN_UP);
++                    set_button(&state.D,     remstate.buttons & CWIID_BTN_DOWN);
 +
 +				wlt = weight(wiistate.ext.balance.left_top, balance_cal.left_top);
 +				wrt = weight(wiistate.ext.balance.right_top, balance_cal.right_top);
@@ -135,7 +172,7 @@ Index: share/tilt_wii.c
 +
 +                    if ((bal_y >= -1) && (bal_y <= 1))
                      {
-+					bal_y *= 12;
++					bal_y *= 15;
                          state.x = (state.x * (FILTER - 1) +
 -                                   wiimote.tilt.y) / FILTER;
 +                                   bal_y) / FILTER;
@@ -143,7 +180,7 @@ Index: share/tilt_wii.c
 -                    if (isnormal(wiimote.tilt.x))
 +                    if ((bal_x >= -1) && (bal_x <= 1))
                      {
-+					bal_x *= 12;
++					bal_x *= 15;
                          state.z = (state.z * (FILTER - 1) +
 -                                   wiimote.tilt.x) / FILTER;
 +                                   bal_x) / FILTER;
@@ -157,21 +194,8 @@ Index: share/tilt_wii.c
      }
      return 0;
  }
-@@ -295,3 +336,4 @@
+@@ -295,3 +353,4 @@ int tilt_stat(void)
  }
  
  /*---------------------------------------------------------------------------*/
 +
-Index: Makefile
-===================================================================
---- Makefile	(revision 3711)
-+++ Makefile	(working copy)
-@@ -105,7 +105,7 @@
- INTL_LIBS :=
- 
- ifeq ($(ENABLE_TILT),wii)
--    TILT_LIBS := -lcwiimote -lbluetooth
-+    TILT_LIBS := -lcwiid -lbluetooth
- else
- ifeq ($(ENABLE_TILT),loop)
-     TILT_LIBS := -lusb-1.0 -lfreespace
