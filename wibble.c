@@ -11,12 +11,7 @@
  *
  * Controls:
  *    D-Pad Up     toggle auto / manual mode
- *    D-Pad Left   previous animation
- *    D-Pad Right  next animation
- *    D-Pad Down   toggle rumble
  *
- *    -            decrease animation speed
- *    +            increase animation speed
  *
  *    Home         quit
  */
@@ -69,6 +64,10 @@ void set_led_fun(int new_mode)
 		cur_mode = max_current;
 	else if (cur_mode > max_current)
 		cur_mode = 0;
+
+	if (!auto_mode) {
+		printf("new mode %d\n", cur_mode);
+	}
 
 	switch (cur_mode) {
 	case 0:
@@ -145,6 +144,7 @@ int main()
 
 	uint8_t next_mode = 0;
 
+	puts("Press 1+2 to connect wiimote.");
 	if ((wiimote = cwiid_open(BDADDR_ANY, 0)) == NULL) {
 		fputs("Unable to connect\n", stderr);
 		return EXIT_FAILURE;
@@ -232,8 +232,18 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 				cnt_max += 1;
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_UP) {
 				auto_mode = !auto_mode;
-				if (auto_mode)
+				if (auto_mode) {
 					x_max = X_MAXP;
+					puts("Auto mode enabled");
+					puts("- Fap to vibrate");
+					puts("- Down arrow to toggle vibration");
+					puts("- Tilt to change animation speed");
+				} else {
+					puts("Auto mode disabled");
+					puts("- Down arrow to vibrate");
+					puts("- Left/Right to change animation");
+					puts("- +/- to change animation speed");
+				}
 			}
 
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_DOWN) {
