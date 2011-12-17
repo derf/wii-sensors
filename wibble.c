@@ -12,7 +12,6 @@
  * Controls:
  *    D-Pad Up     toggle auto / manual mode
  *
- *
  *    Home         quit
  */
 
@@ -66,7 +65,8 @@ void set_led_fun(int new_mode)
 		cur_mode = 0;
 
 	if (!auto_mode) {
-		printf("new mode %d\n", cur_mode);
+		printf("\r\033[2Kmode %d", cur_mode);
+		fflush(stdout);
 	}
 
 	switch (cur_mode) {
@@ -149,7 +149,6 @@ int main()
 		fputs("Unable to connect\n", stderr);
 		return EXIT_FAILURE;
 	}
-	fputs("connected\n", stdout);
 
 	sleep(2);
 
@@ -159,7 +158,7 @@ int main()
 		fputs("unable to retrieve accelerometer calibration\n", stderr);
 
 	if (!cwiid_get_state(wiimote, &state))
-		printf("battery at %d%%\n",
+		printf("connected - battery at %d%%\n",
 			(int)(100.0 * state.battery / CWIID_BATTERY_MAX));
 
 	if (cwiid_set_mesg_callback(wiimote, cwiid_callback))
@@ -234,15 +233,16 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 				auto_mode = !auto_mode;
 				if (auto_mode) {
 					x_max = X_MAXP;
-					puts("Auto mode enabled");
-					puts("- Fap to vibrate");
+					puts("\r\033[2KAuto mode enabled");
+					puts("- Shake to vibrate");
 					puts("- Down arrow to toggle vibration");
 					puts("- Tilt to change animation speed");
+					puts("- Let wiimote fall to calculate fall height\n");
 				} else {
 					puts("Auto mode disabled");
 					puts("- Down arrow to vibrate");
 					puts("- Left/Right to change animation");
-					puts("- +/- to change animation speed");
+					puts("- +/- to change animation speed\n");
 				}
 			}
 
