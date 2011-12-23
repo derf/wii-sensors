@@ -1,4 +1,4 @@
-CFLAGS = -Wall -Wextra -pedantic
+CFLAGS = -Wall -Wextra -pedantic -Wno-unused-parameter
 LDFLAGS = -lbluetooth -lcwiid
 
 all: bal mpcal mplog wibble
