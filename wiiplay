@@ -29,7 +29,7 @@ else
 
 fi
 
-sox --norm /tmp/wiiplay.wav -b 8 /tmp/wiiplay.raw channels 1 rate 1500
+sox --norm /tmp/wiiplay.wav -b 8 /tmp/wiiplay.raw channels 1 rate 2000
 
 rm /tmp/wiiplay.wav
 
