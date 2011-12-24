@@ -24,7 +24,17 @@ Where Pitch, Roll and Yaw are the raw 16-bit values.
 
 Usage: ./mplog **>** *filename*
 
-See also: http://www.grc.nasa.gov/WWW/k-12/airplane/Images/rotations.gif
+See also:
+
+* http://www.grc.nasa.gov/WWW/k-12/airplane/Images/rotations.gif
+
+## neverball
+
+Experimental patch to control neverball with the balance board.
+
+See also:
+
+* http://finalrewind.org/interblag/entry/neverball-balance-board/
 
 ## wibble
 
