@@ -60,7 +60,7 @@ double getvolume(uint8_t *sample, int length)
 	if ((rms > maxrms))
 		maxrms = (rms + maxrms) / 2;
 
-	return (rms - minrms) / (maxrms - minrms) * 5.0;
+	return (rms - minrms) / (maxrms - minrms) * 8.0;
 }
 
 int main(int argc, char **argv)
@@ -136,8 +136,7 @@ int main(int argc, char **argv)
 				case 1: ledbits = 0x1; break;
 				case 2: ledbits = 0x3; break;
 				case 3: ledbits = 0x7; break;
-				case 4:
-				case 5: ledbits = 0xf; break;
+				default: ledbits = 0xf; break;
 			}
 
 			printf("\r\033[2Kplaying %7.3f @ %6d \033[1m%c\033[0m  ",
