@@ -1,0 +1,36 @@
+#!/usr/bin/env zsh
+## Copyright © 2011 by Daniel Friesel <derf@finalrewind.org>
+## License: WTFPL:
+##   0. You just DO WHAT THE FUCK YOU WANT TO
+
+setopt err_exit
+
+if [[ -z $1 || -z $2 ]]; then
+	echo "Usage: $0 <file>" >&2
+	exit 1
+fi
+
+if [[ ${2:e} == ogg ]]; then
+
+	oggdec -o /tmp/wiiplay.wav ${2}
+
+elif [[ ${2:e} == mp3 ]]; then
+
+	mpg321 -w /tmp/wiiplay.wav ${2}
+
+elif [[ ${2:e} == wav ]]; then
+
+	cp ${2} /tmp/wiiplay.wav
+
+else
+
+	echo "${2:e}: unsupported format" >&2
+	exit 1
+
+fi
+
+sox --norm /tmp/wiiplay.wav -b 8 /tmp/wiiplay.raw channels 1 rate 1500
+
+rm /tmp/wiiplay.wav
+
+./wiispkr ${1} < /tmp/wiiplay.raw

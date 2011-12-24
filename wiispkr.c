@@ -80,11 +80,11 @@ int main(int argc, char **argv)
 		t = (tv.tv_sec * 1000000 + tv.tv_usec) / 100;
 
 		if (t > timeout) {
-			printf("play second %f pos %d\n", (double)(t - start) / 10000, fpos);
+			printf("\r\033[2Kplay second %f pos %d", (double)(t - start) / 10000, fpos);
+			fflush(stdout);
 			if ((readbytes = read(0, &sample, sizeof(sample))) == -1)
 				return 0;
 			fpos += readbytes;
-			print_sample(sample, sizeof(sample));
 			wiimote_speaker_play(&wiimote, sample, sizeof(sample));
 			timeout = t + 130;
 		}
