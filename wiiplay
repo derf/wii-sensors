@@ -6,7 +6,7 @@
 setopt err_exit
 
 if [[ -z $1 || -z $2 ]]; then
-	echo "Usage: $0 <file>" >&2
+	echo "Usage: $0 <btaddr> <file>" >&2
 	exit 1
 fi
 
@@ -33,4 +33,6 @@ sox --norm /tmp/wiiplay.wav -b 8 /tmp/wiiplay.raw channels 1 rate 2000
 
 rm /tmp/wiiplay.wav
 
-./wiispkr ${1} < /tmp/wiiplay.raw
+./wiispkr ${1} < /tmp/wiiplay.raw 2> /dev/null
+
+rm /tmp/wiiplay.raw
