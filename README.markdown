@@ -40,7 +40,7 @@ See also:
 
 Wiimote Blinkenlights. Press D-Pad up to toggle modes, Home to quit.
 
-Usage: ./wibble`
+Usage: ./wibble
 
 ## wiiplay
 
@@ -50,11 +50,13 @@ speaker.
 Requires: `mpg321` / `oggdec` and `sox`. Also, `wiispkr` must be in the current
 working directory.
 
-Usage: ./wiiplay *btaddr* *file*
+Usage: ./wiiplay *btaddr* *file* [*volume*]
+
+Accepted volumes are 0 .. 255, the default is 64.
 
 ## wiispkr
 
 Plays an 8bit 2kHz signed PCM file on the wiimote speaker. You can create one
 using e.g. `sox --norm /tmp/in.wav -b 8 /tmp/out.raw channels 1 rate 2000`
 
-Usage: ./wiispkr *btaddr* **<** *file*
+Usage: ./wiispkr *btaddr* [*volume*] **<** *file*
