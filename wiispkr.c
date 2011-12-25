@@ -163,7 +163,7 @@ int main(int argc, char **argv)
 			else
 				report_err = 0;
 
-			timeout = t + 100;
+			timeout = t + 99;
 		}
 		else
 			usleep((timeout - t) * 10);
