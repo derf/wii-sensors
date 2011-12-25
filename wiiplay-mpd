@@ -1,0 +1,23 @@
+#!/bin/sh
+## Copyright © 2011 by Daniel Friesel <derf@finalrewind.org>
+## License: WTFPL:
+##   0. You just DO WHAT THE FUCK YOU WANT TO.
+
+if [ ! -r /tmp/mpdw.fifo ]
+then
+	cat >&2 <<EOF
+/tmp/mpdw.fifo not found
+Add the following lines to your mpd.conf:
+
+audio_output {
+	type            "fifo"
+	name            "Wiimote"
+	path            "/tmp/mpdw.fifo"
+	format          "2000:16:1"
+}
+EOF
+	exit 1
+fi
+
+sox -b 16 -e signed -r 2000 -t raw /tmp/mpdw.fifo -b 8 -t raw /dev/stdout | \
+./wiispkr "$@" 2> /dev/null
