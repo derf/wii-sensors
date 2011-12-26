@@ -1,0 +1,8 @@
+#!/bin/sh
+
+while true; do
+	tail -n 2000 /tmp/wibble.log | head -n 1999 > /tmp/wibble.tail
+	gnuplot plot
+	convert /tmp/mp.ps /tmp/mp.png
+	date
+done
