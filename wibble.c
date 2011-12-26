@@ -37,12 +37,14 @@ volatile char auto_rumble = 1;
 volatile int  cur_mode = 0;
 
 volatile enum {
-	AUTO_MODE, BLINKEN_MODE, DRAW_MODE, INVAL_MODE
+	AUTO_MODE, BLINKEN_MODE, DRAW_MODE, DRAWCIRCLE_MODE, INVAL_MODE
 } opmode = AUTO_MODE;
 
 volatile int8_t cnt_max = 7;
 volatile uint8_t f_led[4][X_MAX];
 volatile uint8_t x_max = X_MAXP;
+
+volatile char drawing = 0;
 
 struct acc_cal wm_cal;
 
@@ -174,8 +176,9 @@ int main()
 	if (cwiid_set_mesg_callback(wiimote, cwiid_callback))
 		fputs("cannot set callback. buttons won't work.\n", stderr);
 	
-/*	cwiid_enable(wiimote, CWIID_FLAG_MOTIONPLUS);
-*/
+	if (cwiid_enable(wiimote, CWIID_FLAG_MOTIONPLUS))
+		fputs("Unable to enable motionplus\n", stderr);
+
 	if (cwiid_enable(wiimote, CWIID_FLAG_MESG_IFC))
 		fputs("cannot enable callback. buttons won't work.\n", stderr);
 
@@ -185,7 +188,7 @@ int main()
 
 	while (1) {
 
-		if (opmode == DRAW_MODE) {
+		if (opmode == DRAWCIRCLE_MODE) {
 			sleep(1);
 			continue;
 		}
@@ -250,8 +253,12 @@ void handle_button_normal(cwiid_wiimote_t *wiimote,
 void handle_button_draw(cwiid_wiimote_t *wiimote,
 	uint16_t buttons)
 {
-	if (buttons & CWIID_BTN_LEFT)
-		puts("o hai");
+	if (buttons & (CWIID_BTN_A | CWIID_BTN_1))
+		drawing = 1;
+	else if (buttons & (CWIID_BTN_B | CWIID_BTN_2))
+		drawing = -1;
+	else
+		drawing = 0;
 }
 
 /* 97 .. 122 .. 150 */
@@ -390,6 +397,41 @@ void handle_acc_draw(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
 	fflush(stdout);
 }
 
+void handle_mp_draw(cwiid_wiimote_t *wiimote, struct cwiid_motionplus_mesg *mm)
+{
+	static char space[3600];
+	static char was_drawing = 0;
+	static int pos = 0, pos_old = 0;;
+
+	int delta = mm->angle_rate[2] - 8230;
+
+	if (abs(delta) > 50)
+		pos = (pos + (delta / 180) + 3600) % 3600;
+
+		if (drawing && was_drawing) {
+			if (abs(pos_old - pos) < 2000)
+				for (int i = pos_old; i != pos;
+						i = (i + (pos_old < pos ? 1 : -1) + 3600) % 3600)
+					space[i] = ((drawing == 1) ? 1 : 0);
+			else
+				for (int i = pos_old; i != pos;
+						i = (i + (pos_old > pos ? 1 : -1) + 3600) % 3600)
+					space[i] = ((drawing == 1) ? 1 : 0);
+		}
+
+
+	if ((space[(uint16_t)pos] && (drawing != -1)) || (drawing == 1))
+		cwiid_set_led(wiimote, 0xf);
+	else
+		cwiid_set_led(wiimote, 0x0);
+
+	printf("\r\033[2K Position: %4d -> %4d", pos_old, pos);
+	fflush(stdout);
+
+	pos_old = pos;
+	was_drawing = drawing;
+}
+
 void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 	union cwiid_mesg mesg[], struct timespec *ts)
 {
@@ -416,7 +458,13 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 					break;
 
 					case DRAW_MODE:
-					puts("\r\033[2K Acctest (will become draw mode)");
+					puts("\r\033[2KAcctest (will become draw mode)\n");
+					break;
+
+					case DRAWCIRCLE_MODE:
+					puts("\r\033[2KCircle Draw Mode");
+					puts("- Hold 1 or A to draw");
+					puts("- Hold 2 or B to erase");
 					break;
 
 					case INVAL_MODE:
@@ -424,7 +472,7 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 					break;
 				}
 			}
-			else if (opmode == DRAW_MODE)
+			else if (opmode == DRAWCIRCLE_MODE)
 				handle_button_draw(wiimote, mesg[i].btn_mesg.buttons);
 			else
 				handle_button_normal(wiimote, mesg[i].btn_mesg.buttons);
@@ -439,6 +487,10 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 				handle_acc_auto(wiimote, &mesg[i].acc_mesg, ts);
 			else if (opmode == DRAW_MODE)
 				handle_acc_draw(wiimote, &mesg[i].acc_mesg, ts);
+		}
+		else if (mesg[i].type == CWIID_MESG_MOTIONPLUS) {
+			if (opmode == DRAWCIRCLE_MODE)
+				handle_mp_draw(wiimote, &mesg[i].motionplus_mesg);
 		}
 	}
 }
