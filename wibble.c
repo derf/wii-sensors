@@ -273,6 +273,8 @@ void handle_acc_auto(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
 	struct timespec *ts)
 {
 	static double ff_start = 0.0;
+	static double w_start = 0.0, w_last = 0.0;
+	static int w_count = 0;
 	double ff_diff;
 
 	double a_x = ((double)am->acc[CWIID_X] - wm_cal.zero[CWIID_X]) /
@@ -283,16 +285,37 @@ void handle_acc_auto(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
 		(wm_cal.one[CWIID_Z] - wm_cal.zero[CWIID_Z]);
 	double accel = sqrt(pow(a_x,2)+pow(a_y,2)+pow(a_z,2));
 
+	double now = ((double)ts->tv_nsec / 1000000000) + (double)ts->tv_sec;
+
 	if ((accel < 0.07) && !ff_start)
-		ff_start = ((uint64_t)ts->tv_sec * 1000000000) + ts->tv_nsec;
+		ff_start = now;
 	else if ((accel > 1.0) && ff_start) {
-		ff_diff = ((((uint64_t)ts->tv_sec * 1000000000)
-			+ ts->tv_nsec
-			- ff_start) / 1000000000);
+		ff_diff = now - ff_start;
 
 		printf("delta_t %.3fs - Fell approx. %.2fm\n", ff_diff,
 			(double)((9.81 * (double)(ff_diff) * (double)(ff_diff)) / (double)2));
 		ff_start = 0;
+	}
+
+	if ((a_y < -2) && !w_start)
+		w_start = now;
+	else if (a_y < -2) {
+		w_count++;
+		w_last = now;
+		if (w_count > 5) {
+			printf("\r\033[2K8====) Wanking for %.f seconds at %4.1fHz",
+				w_last - w_start,
+				w_count / (w_last - w_start)
+			);
+			fflush(stdout);
+		}
+	}
+
+	if (w_last && ((now - w_last) > 5)) {
+		w_count = 0;
+		w_start = w_last = 0.0;
+		fputs("\r\033[2K", stdout);
+		fflush(stdout);
 	}
 
 	if (auto_rumble && (accel > 1.5)) {
