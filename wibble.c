@@ -176,9 +176,6 @@ int main()
 	if (cwiid_set_mesg_callback(wiimote, cwiid_callback))
 		fputs("cannot set callback. buttons won't work.\n", stderr);
 	
-	if (cwiid_enable(wiimote, CWIID_FLAG_MOTIONPLUS))
-		fputs("Unable to enable motionplus\n", stderr);
-
 	if (cwiid_enable(wiimote, CWIID_FLAG_MESG_IFC))
 		fputs("cannot enable callback. buttons won't work.\n", stderr);
 
@@ -425,9 +422,6 @@ void handle_mp_draw(cwiid_wiimote_t *wiimote, struct cwiid_motionplus_mesg *mm)
 	else
 		cwiid_set_led(wiimote, 0x0);
 
-	printf("\r\033[2K Position: %4d -> %4d", pos_old, pos);
-	fflush(stdout);
-
 	pos_old = pos;
 	was_drawing = drawing;
 }
@@ -448,6 +442,11 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 					puts("- Down arrow to toggle vibration");
 					puts("- Tilt to change animation speed");
 					puts("- Let wiimote fall to calculate fall height\n");
+
+					sleep(1);
+					if (cwiid_disable(wiimote, CWIID_FLAG_MOTIONPLUS))
+						fputs("Unable to disable motionplus O.o", stderr);
+
 					break;
 
 					case BLINKEN_MODE:
@@ -464,7 +463,12 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 					case DRAWCIRCLE_MODE:
 					puts("\r\033[2KCircle Draw Mode");
 					puts("- Hold 1 or A to draw");
-					puts("- Hold 2 or B to erase");
+					puts("- Hold 2 or B to erase\n");
+
+					sleep(1);
+					if (cwiid_enable(wiimote, CWIID_FLAG_MOTIONPLUS))
+						fputs("Unable to enable motionplus!", stderr);
+
 					break;
 
 					case INVAL_MODE:
