@@ -185,6 +185,11 @@ int main()
 
 	while (1) {
 
+		if (opmode == DRAW_MODE) {
+			sleep(1);
+			continue;
+		}
+
 		if (++cnt >= cnt_max) {
 			cnt = 0;
 			
@@ -255,7 +260,7 @@ void handle_button_draw(cwiid_wiimote_t *wiimote,
 void handle_acc_auto(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
 	struct timespec *ts)
 {
-	static double ff_start = 0.0, ff_stop = 0.0;
+	static double ff_start = 0.0;
 	double ff_diff;
 
 	double a_x = ((double)am->acc[CWIID_X] - wm_cal.zero[CWIID_X]) /
@@ -307,6 +312,84 @@ void handle_acc_auto(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
 	}
 }
 
+void handle_acc_draw(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
+	struct timespec *ts)
+{
+	static int8_t pos_x = 0, pos_y = 0, pos_z = 0;
+	static float rel_x = 0, rel_y = 0, rel_z = 0;
+	static float start_x = 0, start_y = 0, start_z = 0;
+
+	float ftime = (((float)ts->tv_nsec * 1000000000) + ts->tv_sec);
+
+	double a_x = ((double)am->acc[CWIID_X] - wm_cal.zero[CWIID_X]) /
+		(wm_cal.one[CWIID_X] - wm_cal.zero[CWIID_X]);
+	double a_y = ((double)am->acc[CWIID_Y] - wm_cal.zero[CWIID_Y]) /
+		(wm_cal.one[CWIID_Y] - wm_cal.zero[CWIID_Y]);
+	double a_z = ((double)am->acc[CWIID_Z] - wm_cal.zero[CWIID_Z]) /
+		(wm_cal.one[CWIID_Z] - wm_cal.zero[CWIID_Z]);
+	double accel = sqrt(pow(a_x,2)+pow(a_y,2)+pow(a_z,2));
+	double roll = atan(a_x / a_z);
+	if (a_z <= 0.0) {
+		roll += 3.14159265358979323 * ((a_x > 0.0) ? 1 : -1);
+	}
+	double pitch = atan( a_y / a_z * cos(roll));
+
+	if ((accel > 0.95) || (accel < 1.05))
+		rel_x = rel_y = rel_z = 0;
+
+	if ((a_x < -0.1) || (a_x > 0.1)) {
+		if (!start_x)
+			start_x = ftime;
+		rel_x += a_x * -10;
+
+		if ((ftime - start_x) > 0.2) {
+			start_x = ftime;
+			pos_x += rel_x;
+		}
+	}
+	if ((a_y < -0.1) || (a_y > 0.1)) {
+		if (!start_y)
+			start_y = ftime;
+		rel_y += a_y * -10;
+
+		if ((ftime - start_y) > 0.2) {
+			start_y = ftime;
+			pos_y += rel_y;
+		}
+	}
+
+	if (pos_x < 0) {
+		pos_x = 0;
+		rel_x = 0;
+	}
+	if (pos_x > 100) {
+		pos_x = 100;
+		rel_x = 0;
+	}
+	if (pos_y < 0) {
+		pos_y = 0;
+		rel_y = 0;
+	}
+	if (pos_y > 100) {
+		pos_y = 100;
+		rel_y = 0;
+	}
+	if (pos_z < 0) {
+		pos_z = 0;
+		rel_z = 0;
+	}
+	if (pos_z > 100) {
+		pos_z = 100;
+		rel_z = 0;
+	}
+
+	printf("\r\033[2KX=%3d Y=%3d Z=%3d %5.2f %5.2f %5.2f  roll=%5.2f pitch=%5.2f",
+		pos_x, pos_y, pos_z,
+		a_x - (roll / 1.53), a_y - (pitch / 1.57), a_z - (roll - 1.53) / 1.53,
+		roll, pitch);
+	fflush(stdout);
+}
+
 void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 	union cwiid_mesg mesg[], struct timespec *ts)
 {
@@ -318,7 +401,7 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 				switch (opmode) {
 					case AUTO_MODE:
 					x_max = X_MAXP;
-					puts("\r\033[2KAuto mode enabled");
+					puts("\r\033[2KAuto Mode");
 					puts("- Shake to vibrate");
 					puts("- Down arrow to toggle vibration");
 					puts("- Tilt to change animation speed");
@@ -326,14 +409,14 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 					break;
 
 					case BLINKEN_MODE:
-					puts("\r\033[2KAuto mode disabled");
+					puts("\r\033[2KBlinken Mode");
 					puts("- Down arrow to vibrate");
 					puts("- Left/Right to change animation");
 					puts("- +/- to change animation speed\n");
 					break;
 
 					case DRAW_MODE:
-					puts("\r\033[2KTodo!");
+					puts("\r\033[2K Acctest (will become draw mode)");
 					break;
 
 					case INVAL_MODE:
@@ -351,9 +434,12 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 			}
 
 		}
-		else if ((mesg[i].type == CWIID_MESG_ACC) && (opmode == AUTO_MODE))
-			handle_acc_auto(wiimote, &mesg[i].acc_mesg, ts);
-
+		else if (mesg[i].type == CWIID_MESG_ACC) {
+			if (opmode == AUTO_MODE)
+				handle_acc_auto(wiimote, &mesg[i].acc_mesg, ts);
+			else if (opmode == DRAW_MODE)
+				handle_acc_draw(wiimote, &mesg[i].acc_mesg, ts);
+		}
 	}
 }
 
