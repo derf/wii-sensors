@@ -34,8 +34,11 @@ cwiid_mesg_callback_t cwiid_callback;
 volatile char rumble = 0;
 volatile char auto_rumble = 1;
 
-volatile char auto_mode = 1;
 volatile int  cur_mode = 0;
+
+volatile enum {
+	AUTO_MODE, BLINKEN_MODE, DRAW_MODE, INVAL_MODE
+} opmode = AUTO_MODE;
 
 volatile int8_t cnt_max = 7;
 volatile uint8_t f_led[4][X_MAX];
@@ -53,6 +56,13 @@ const uint8_t invb[X_MAX] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
+static void set_next_mode()
+{
+	opmode++;
+	if (opmode == INVAL_MODE)
+		opmode = AUTO_MODE;
+}
+
 void set_led_fun(int new_mode)
 {
 	const int max_current = 5;
@@ -64,8 +74,8 @@ void set_led_fun(int new_mode)
 	else if (cur_mode > max_current)
 		cur_mode = 0;
 
-	if (!auto_mode) {
-		printf("\r\033[2Kmode %d", cur_mode);
+	if (opmode == BLINKEN_MODE) {
+		printf("\r\033[2Kanimation %d", cur_mode);
 		fflush(stdout);
 	}
 
@@ -181,7 +191,7 @@ int main()
 			if (++x == x_max) {
 				x = 0;
 
-				if (!auto_mode && (++next_mode == 42)) {
+				if ((opmode == BLINKEN_MODE) && (++next_mode == 42)) {
 					set_led_fun(cur_mode + 1);
 					next_mode = 0;
 				}
@@ -230,29 +240,41 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_MINUS)
 				cnt_max += 1;
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_UP) {
-				auto_mode = !auto_mode;
-				if (auto_mode) {
+				set_next_mode();
+				switch (opmode) {
+					case AUTO_MODE:
 					x_max = X_MAXP;
 					puts("\r\033[2KAuto mode enabled");
 					puts("- Shake to vibrate");
 					puts("- Down arrow to toggle vibration");
 					puts("- Tilt to change animation speed");
 					puts("- Let wiimote fall to calculate fall height\n");
-				} else {
-					puts("Auto mode disabled");
+					break;
+
+					case BLINKEN_MODE:
+					puts("\r\033[2KAuto mode disabled");
 					puts("- Down arrow to vibrate");
 					puts("- Left/Right to change animation");
 					puts("- +/- to change animation speed\n");
+					break;
+
+					case DRAW_MODE:
+					puts("\r\033[2KTodo!");
+					break;
+
+					case INVAL_MODE:
+					puts("\r\033[2KThis should never happen.");
+					break;
 				}
 			}
 
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_DOWN) {
-				if (auto_mode)
+				if (opmode == AUTO_MODE)
 					auto_rumble = !auto_rumble;
-				else if (!rumble)
+				else if (!rumble && (opmode == BLINKEN_MODE))
 					cwiid_set_rumble(wiimote, (rumble = 1));
 			}
-			else if (rumble && !auto_mode)
+			else if (rumble && (opmode == BLINKEN_MODE))
 				cwiid_set_rumble(wiimote, (rumble = 0));
 
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_HOME) {
@@ -274,7 +296,7 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 				fp_start = 0;
 			}
 		}
-*/		else if ((mesg[i].type == CWIID_MESG_ACC) && auto_mode) {
+*/		else if ((mesg[i].type == CWIID_MESG_ACC) && (opmode == AUTO_MODE)) {
 
 			am = &mesg[i].acc_mesg;
 
