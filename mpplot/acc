@@ -1,0 +1,13 @@
+set xlabel "Time"
+set ylabel "Sensor Value"
+#set yrange [0:16000]
+
+set size 1.0, 0.6
+set terminal postscript portrait enhanced mono dashed lw 1 "Helvetica" 14
+
+set title "Sensors"
+set output '/tmp/wii.ps'
+plot '/tmp/wii.tail' using 1:2 with lines lt 1 lc rgb "green" title "X", \
+     '/tmp/wii.tail' using 1:3 with lines lt 1 lc rgb "blue" title "Y", \
+     '/tmp/wii.tail' using 1:4 with lines lt 1 lc rgb "red" title "Z", \
+     '/tmp/wii.tail' using 1:5 with lines lt 2 lc rgb "black" title "A"

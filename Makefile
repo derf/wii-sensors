@@ -1,7 +1,10 @@
-CFLAGS = -Wall -Wextra -pedantic -Wno-unused-parameter
+CFLAGS = -Wall -Wextra -pedantic -Wno-unused-parameter -ggdb
 LDFLAGS = -lbluetooth -lcwiid
 
-all: bal mpcal mplog wibble wiispkr
+all: acclog bal mpcal mplog wibble wiispkr
+
+acclog: acclog.c
+	${CC} ${CFLAGS} ${LDFLAGS} -lm -o $@ $<
 
 bal: bal.c
 	${CC} ${CFLAGS} ${LDFLAGS} -o $@ $<

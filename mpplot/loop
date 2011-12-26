@@ -1,8 +1,12 @@
 #!/bin/sh
 
+set -e
+
+test -r "$1"
+
 while true; do
-	tail -n 2000 /tmp/wibble.log | head -n 1999 > /tmp/wibble.tail
-	gnuplot plot
-	convert /tmp/mp.ps /tmp/mp.png
+	tail -n 2000 /tmp/wii.log | head -n 1999 > /tmp/wii.tail
+	gnuplot "$1"
+	convert /tmp/wii.ps /tmp/wii.png
 	date
 done
