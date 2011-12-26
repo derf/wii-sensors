@@ -217,28 +217,102 @@ int main()
 	return EXIT_SUCCESS;
 }
 
+void handle_button_normal(cwiid_wiimote_t *wiimote,
+	uint16_t buttons)
+{
+	if (buttons & CWIID_BTN_LEFT)
+		set_led_fun(cur_mode - 1);
+
+	if (buttons & CWIID_BTN_RIGHT)
+		set_led_fun(cur_mode + 1);
+
+	if (buttons & CWIID_BTN_PLUS)
+		cnt_max -= (cnt_max > 1 ? 1 : 0);
+
+	if (buttons & CWIID_BTN_MINUS)
+		cnt_max += 1;
+
+	if (buttons & CWIID_BTN_DOWN) {
+		if (opmode == AUTO_MODE)
+			auto_rumble = !auto_rumble;
+		else if (!rumble && (opmode == BLINKEN_MODE))
+			cwiid_set_rumble(wiimote, (rumble = 1));
+	}
+	else if (rumble && (opmode == BLINKEN_MODE))
+		cwiid_set_rumble(wiimote, (rumble = 0));
+}
+
+void handle_button_draw(cwiid_wiimote_t *wiimote,
+	uint16_t buttons)
+{
+	if (buttons & CWIID_BTN_LEFT)
+		puts("o hai");
+}
+
 /* 97 .. 122 .. 150 */
 /* mp: normal 8200 .. 8250? */
+
+void handle_acc_auto(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
+	struct timespec *ts)
+{
+	static double ff_start = 0.0, ff_stop = 0.0;
+	double ff_diff;
+
+	double a_x = ((double)am->acc[CWIID_X] - wm_cal.zero[CWIID_X]) /
+		(wm_cal.one[CWIID_X] - wm_cal.zero[CWIID_X]);
+	double a_y = ((double)am->acc[CWIID_Y] - wm_cal.zero[CWIID_Y]) /
+		(wm_cal.one[CWIID_Y] - wm_cal.zero[CWIID_Y]);
+	double a_z = ((double)am->acc[CWIID_Z] - wm_cal.zero[CWIID_Z]) /
+		(wm_cal.one[CWIID_Z] - wm_cal.zero[CWIID_Z]);
+	double accel = sqrt(pow(a_x,2)+pow(a_y,2)+pow(a_z,2));
+
+	if ((accel < 0.07) && !ff_start)
+		ff_start = ((uint64_t)ts->tv_sec * 1000000000) + ts->tv_nsec;
+	else if ((accel > 1.0) && ff_start) {
+		ff_diff = ((((uint64_t)ts->tv_sec * 1000000000)
+			+ ts->tv_nsec
+			- ff_start) / 1000000000);
+
+		printf("delta_t %.3fs - Fell approx. %.2fm\n", ff_diff,
+			(double)((9.81 * (double)(ff_diff) * (double)(ff_diff)) / (double)2));
+		ff_start = 0;
+	}
+
+	if (auto_rumble && (accel > 1.5)) {
+		if (!rumble)
+			cwiid_set_rumble(wiimote, (rumble = 1));
+	}
+	else {
+		if (rumble)
+			cwiid_set_rumble(wiimote, (rumble = 0));
+	}
+
+	if (am->acc[CWIID_X] < 123) {
+
+		if (cur_mode != 0)
+			set_led_fun(0);
+
+		cnt_max = (am->acc[CWIID_X] - 95) / 2;
+		if (cnt_max < 2)
+			cnt_max = 2;
+	}
+	else {
+
+		if (cur_mode != 1)
+			set_led_fun(1);
+
+		cnt_max = (150 - am->acc[CWIID_X]) / 2;
+		if (cnt_max < 2)
+			cnt_max = 2;
+	}
+}
 
 void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 	union cwiid_mesg mesg[], struct timespec *ts)
 {
-	static double ff_start, ff_diff;
-	static double fp_start, fp_diff;
-	double a_x, a_y, a_z, accel;
-	struct cwiid_acc_mesg *am;
-
 	for (int i = 0; i < mesg_count; i++) {
 		if (mesg[i].type == CWIID_MESG_BTN) {
 
-			if (mesg[i].btn_mesg.buttons & CWIID_BTN_LEFT)
-				set_led_fun(cur_mode - 1);
-			if (mesg[i].btn_mesg.buttons & CWIID_BTN_RIGHT)
-				set_led_fun(cur_mode + 1);
-			if (mesg[i].btn_mesg.buttons & CWIID_BTN_PLUS)
-				cnt_max -= (cnt_max > 1 ? 1 : 0);
-			if (mesg[i].btn_mesg.buttons & CWIID_BTN_MINUS)
-				cnt_max += 1;
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_UP) {
 				set_next_mode();
 				switch (opmode) {
@@ -267,87 +341,19 @@ void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
 					break;
 				}
 			}
-
-			if (mesg[i].btn_mesg.buttons & CWIID_BTN_DOWN) {
-				if (opmode == AUTO_MODE)
-					auto_rumble = !auto_rumble;
-				else if (!rumble && (opmode == BLINKEN_MODE))
-					cwiid_set_rumble(wiimote, (rumble = 1));
-			}
-			else if (rumble && (opmode == BLINKEN_MODE))
-				cwiid_set_rumble(wiimote, (rumble = 0));
+			else if (opmode == DRAW_MODE)
+				handle_button_draw(wiimote, mesg[i].btn_mesg.buttons);
+			else
+				handle_button_normal(wiimote, mesg[i].btn_mesg.buttons);
 
 			if (mesg[i].btn_mesg.buttons & CWIID_BTN_HOME) {
 				exit(0);
 			}
 
 		}
-/*		else if ((mesg[i].type == CWIID_MESG_MOTIONPLUS) && auto_mode ) {
+		else if ((mesg[i].type == CWIID_MESG_ACC) && (opmode == AUTO_MODE))
+			handle_acc_auto(wiimote, &mesg[i].acc_mesg, ts);
 
-			if ((mesg[i].motionplus_mesg.angle_rate[2] < 8000) && !fp_start)
-				fp_start = ((uint64_t)ts->tv_sec * 1000000000) + ts->tv_nsec;
-			else if ((mesg[i].motionplus_mesg.angle_rate[2] > 8200) && fp_start) {
-				fp_diff = ((((uint64_t)ts->tv_sec * 1000000000)
-					+ ts->tv_nsec
-					- ff_start) / 1000000000);
-
-				printf("mpdel_t %.3fs - Fell approx. %.2fm\n", ff_diff,
-					(double)((9.81 * (double)(fp_diff) * (double)(fp_diff)) / (double)2));
-				fp_start = 0;
-			}
-		}
-*/		else if ((mesg[i].type == CWIID_MESG_ACC) && (opmode == AUTO_MODE)) {
-
-			am = &mesg[i].acc_mesg;
-
-			a_x = ((double)am->acc[CWIID_X] - wm_cal.zero[CWIID_X]) /
-				(wm_cal.one[CWIID_X] - wm_cal.zero[CWIID_X]);
-			a_y = ((double)am->acc[CWIID_Y] - wm_cal.zero[CWIID_Y]) /
-				(wm_cal.one[CWIID_Y] - wm_cal.zero[CWIID_Y]);
-			a_z = ((double)am->acc[CWIID_Z] - wm_cal.zero[CWIID_Z]) /
-				(wm_cal.one[CWIID_Z] - wm_cal.zero[CWIID_Z]);
-			accel = sqrt(pow(a_x,2)+pow(a_y,2)+pow(a_z,2));
-
-			if ((accel < 0.07) && !ff_start)
-				ff_start = ((uint64_t)ts->tv_sec * 1000000000) + ts->tv_nsec;
-			else if ((accel > 1.0) && ff_start) {
-				ff_diff = ((((uint64_t)ts->tv_sec * 1000000000)
-					+ ts->tv_nsec
-					- ff_start) / 1000000000);
-
-				printf("delta_t %.3fs - Fell approx. %.2fm\n", ff_diff,
-					(double)((9.81 * (double)(ff_diff) * (double)(ff_diff)) / (double)2));
-				ff_start = 0;
-			}
-
-			if (auto_rumble && (accel > 1.5)) {
-				if (!rumble)
-					cwiid_set_rumble(wiimote, (rumble = 1));
-			}
-			else {
-				if (rumble)
-					cwiid_set_rumble(wiimote, (rumble = 0));
-			}
-
-			if (mesg[i].acc_mesg.acc[CWIID_X] < 123) {
-
-				if (cur_mode != 0)
-					set_led_fun(0);
-
-				cnt_max = (mesg[i].acc_mesg.acc[CWIID_X] - 95) / 2;
-				if (cnt_max < 2)
-					cnt_max = 2;
-			}
-			else {
-
-				if (cur_mode != 1)
-					set_led_fun(1);
-
-				cnt_max = (150 - mesg[i].acc_mesg.acc[CWIID_X]) / 2;
-				if (cnt_max < 2)
-					cnt_max = 2;
-			}
-		}
 	}
 }
 
