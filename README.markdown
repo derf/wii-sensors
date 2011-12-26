@@ -54,6 +54,16 @@ Usage: ./wiiplay *btaddr* *file* [*volume*]
 
 Accepted volumes are 0 .. 255, the default is 64.
 
+## wiiplay-mpd
+
+Outputs music played on a local MPD on the Wiimote speaker. Requires `wiispkr`
+in the current working directory and `sox` in $PATH.
+
+Usage: ./wiiplay-mpd *btaddr* [*volume*]
+
+If the MPD does not have a suitable FIFO output, wiiplay-mpd will output
+a suitable configuration snippet.
+
 ## wiispkr
 
 Plays an 8bit 2kHz signed PCM file on the wiimote speaker. You can create one
