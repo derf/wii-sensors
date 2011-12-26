@@ -298,12 +298,12 @@ void handle_acc_auto(cwiid_wiimote_t *wiimote, struct cwiid_acc_mesg *am,
 	}
 
 	if ((a_y < -2) && !w_start)
-		w_start = now;
-	else if (a_y < -2) {
+		w_start = w_last = now;
+	else if ((a_y < -2) && ((now - w_last) > 0.2)) {
 		w_count++;
 		w_last = now;
 		if (w_count > 5) {
-			printf("\r\033[2K8====) Wanking for %.f seconds at %4.1fHz",
+			printf("\r\033[2K%.f seconds at %4.1fHz",
 				w_last - w_start,
 				w_count / (w_last - w_start)
 			);
