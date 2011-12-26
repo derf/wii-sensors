@@ -67,7 +67,7 @@ static void set_next_mode()
 
 void set_led_fun(int new_mode)
 {
-	const int max_current = 5;
+	const int max_current = 6;
 	int i;
 
 	cur_mode = new_mode;
@@ -135,6 +135,14 @@ void set_led_fun(int new_mode)
 			f_led[0][i] = f_led[1][i] = f_led[2][i] = f_led[3][i]
 				= (i % 2) * 10;
 		break;
+	case 6:
+		x_max = X_MAXS;
+		for (i = 0; i < x_max; i++) {
+			f_led[0][i] = ((i % 10) == 0) * 10;
+			f_led[1][i] = ((i % 10) == 1) * 10;
+			f_led[2][i] = ((i % 10) == 2) * 10;
+			f_led[3][i] = ((i % 10) == 3) * 10;
+		}
 	}
 }
 
