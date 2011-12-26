@@ -62,7 +62,7 @@ in the current working directory and `sox` in $PATH.
 Usage: ./wiiplay-mpd *btaddr* [*volume*]
 
 If the MPD does not have a suitable FIFO output, wiiplay-mpd will output
-a suitable configuration snippet.
+the necessary configuration snippet.
 
 ## wiispkr
 
