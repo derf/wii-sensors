@@ -45,6 +45,7 @@ volatile uint8_t f_led[4][X_MAX];
 volatile uint8_t x_max = X_MAXP;
 
 volatile char drawing = 0;
+volatile char draw_art = 0;
 
 struct acc_cal wm_cal;
 
@@ -264,6 +265,9 @@ void handle_button_draw(cwiid_wiimote_t *wiimote,
 		drawing = -1;
 	else
 		drawing = 0;
+
+	if (buttons & CWIID_BTN_PLUS)
+		draw_art = !draw_art;
 }
 
 /* 97 .. 122 .. 150 */
@@ -455,6 +459,21 @@ void handle_mp_draw(cwiid_wiimote_t *wiimote, struct cwiid_motionplus_mesg *mm)
 
 	pos_old = pos;
 	was_drawing = drawing;
+
+	printf("\r\033[2K %4d ", pos);
+	for (int i = (pos + 2800) % 3600; i != ((pos + 4400) % 3600);
+			i = (i + 10) % 3600) {
+		if (i == pos)
+			putc('|', stdout);
+		else if (space[i])
+			putc('#', stdout);
+		else
+			putc(' ', stdout);
+	}
+	if (draw_art)
+		putc('\n', stdout);
+	else
+		fflush(stdout);
 }
 
 void cwiid_callback(cwiid_wiimote_t *wiimote, int mesg_count,
