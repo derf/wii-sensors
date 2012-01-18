@@ -59,6 +59,11 @@ const uint8_t invb[X_MAX] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
+const uint8_t fadedemo[X_MAX] = {
+	0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0,
+	10, 10, 10, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
 static void set_next_mode()
 {
 	opmode++;
@@ -68,7 +73,7 @@ static void set_next_mode()
 
 void set_led_fun(int new_mode)
 {
-	const int max_current = 6;
+	const int max_current = 7;
 	int i;
 
 	cur_mode = new_mode;
@@ -144,6 +149,13 @@ void set_led_fun(int new_mode)
 			f_led[2][i] = ((i % 10) == 2) * 10;
 			f_led[3][i] = ((i % 10) == 3) * 10;
 		}
+		break;
+	case 7:
+		x_max = X_MAX;
+		for (i = 0; i < x_max; i++)
+			f_led[0][i] = f_led[1][i] = f_led[2][i] = f_led[3][i]
+				= fadedemo[i];
+		break;
 	}
 }
 
