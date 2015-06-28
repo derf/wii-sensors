@@ -9,9 +9,9 @@
  * A note on sample rates:
  * Right now we use 2kHz with 8bit signed pcm.
  * The speaker eats up to 20 bytes of raw data at once, so this gives us
- * 100 updates per second (one every 10 us).
+ * 100 updates per second (one every 10 ms).
  * Higher rates like 3kHz don't work as well, looks like one report
- * every 10us is about as fast as the bluetooth chipset / driver here gets.
+ * every 10ms is about as fast as the bluetooth chipset / driver here gets.
  */
 
 #include <stdio.h>
